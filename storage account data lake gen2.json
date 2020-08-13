@@ -1,0 +1,114 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "0.0.0.1",
+    "parameters": {
+        "accountName": {
+            "minLength": 3,
+            "type": "String",
+            "metadata": {
+                "description": "The prefix to use for resources within the resource group"
+            }
+        },
+        "environmentName": {
+            "minLength": 3,
+            "type": "String",
+            "metadata": {
+                "description": "The prefix to use for resources within the resource group"
+            }
+        },
+        "storageSku": {
+            "defaultValue": "Standard_LRS",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_ZRS",
+                "Standard_GRS",
+                "Standard_RAGRS"
+            ],
+            "type": "String",
+            "metadata": {
+                "description": "Defines the type of storage account to use for the data lake store"
+            }
+        }
+    },
+    "variables": {
+        "storageAccountApiVersion": "[utils.apiVersion('Microsoft.Storage', 'storageAccounts')]",
+        "storageAccountName": "[utils.uniqueName(parameters('accountName'), parameters('environmentName'))]",
+        "storageAccountResourceId": "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
+    },
+    "functions": [
+        {
+            "namespace": "utils",
+            "members": {
+                "apiVersion": {
+                    "parameters": [
+                        {
+                            "name": "providerNamespace",
+                            "type": "String"
+                        },
+                        {
+                            "name": "resourceType",
+                            "type": "String"
+                        }
+                    ],
+                    "output": {
+                        "type": "String",
+                        "value": "[providers(parameters('providerNamespace'), parameters('resourceType')).apiVersions[0]]"
+                    }
+                },
+                "uniqueName": {
+                    "parameters": [
+                        {
+                            "name": "accountName",
+                            "type": "String"
+                        },
+                        {
+                            "name": "environmentName",
+                            "type": "String"
+                        }
+                    ],
+                    "output": {
+                        "type": "String",
+                        "value": "[concat(parameters('accountName'), parameters('environmentName'))]"
+                    }
+                }
+            }
+        }
+    ],
+    "resources": [
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "[variables('storageAccountApiVersion')]",
+            "name": "[variables('storageAccountName')]",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "[parameters('storageSku')]"
+            },
+            "kind": "StorageV2",
+            "properties": {
+                "encryption": {
+                    "keySource": "Microsoft.Storage",
+                    "services": {
+                        "blob": {
+                            "enabled": true
+                        },
+                        "file": {
+                            "enabled": true
+                        }
+                    }
+                },
+                "isHnsEnabled": true,
+                "supportsHttpsTrafficOnly": true
+            }
+        }
+    ],
+    "outputs": {
+        "storageAccountName": {
+            "type": "String",
+            "value": "[variables('storageAccountName')]"
+        },
+        "storageAccountConnectionString": {
+            "type": "String",
+            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', variables('storageAccountName'), ';AccountKey=', listKeys(variables('storageAccountResourceId'), variables('storageAccountApiVersion')).keys[0].value)]"
+        }
+    }
+}
